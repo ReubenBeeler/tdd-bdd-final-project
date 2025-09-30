@@ -106,35 +106,35 @@ def step_impl(context, element_name):
 
 ## UPDATE CODE HERE ##
 
-@when(u'I press the "{button_name}" button')
-def step_impl(context, button_name):
-    button_id = button_name.lower().replace(' ', '_') + '-btn'
-    button = WebDriverWait(context.driver, context.wait_seconds).until(
-        expected_conditions.presence_of_element_located((By.ID, button_id))
-    )
-    button.click()
+@when('I press the "{button}" button')
+def step_impl(context, button):
+    button_id = button.lower() + '-btn'
+    context.driver.find_element_by_id(button_id).click()
 
 @then('I should see the message "{message}"')
 def step_impl(context, message):
-    flash_message = WebDriverWait(context.driver, context.wait_seconds).until(
+    found = WebDriverWait(context.driver, context.wait_seconds).until(
         expected_conditions.text_to_be_present_in_element(
             (By.ID, 'flash_message'),
             message
         )
     )
-    assert flash_message
+    assert(found)
 
-@then(u'I should see "{name}" in the results')
+@then('I should see "{name}" in the results')
 def step_impl(context, name):
-    expected = expected_conditions.text_to_be_present_in_element((By.ID, 'search_results'), name)
-    results = WebDriverWait(context.driver, context.wait_seconds).until(expected)
-    assert results
+    found = WebDriverWait(context.driver, context.wait_seconds).until(
+        expected_conditions.text_to_be_present_in_element(
+            (By.ID, 'search_results'),
+            name
+        )
+    )
+    assert(found)
 
-
-@then(u'I should not see "{name}" in the results')
+@then('I should not see "{name}" in the results')
 def step_impl(context, name):
-    results = context.driver.find_element(By.ID, 'search_results')
-    assert name not in results.text
+    element = context.driver.find_element_by_id('search_results')
+    assert(name not in element.text)
 
 ##################################################################
 # This code works because of the following naming convention:

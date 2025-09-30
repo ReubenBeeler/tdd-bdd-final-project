@@ -107,7 +107,7 @@ def list_products():
     This endpoint will list all products
     """
     products = Product.all()
-    return products, status.HTTP_200_OK
+    return [p.serialize() for p in products], status.HTTP_200_OK
 
 
 ######################################################################
