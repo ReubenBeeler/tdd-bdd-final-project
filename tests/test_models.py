@@ -27,7 +27,7 @@ import os
 import logging
 import unittest
 from decimal import Decimal
-from service.models import Product, Category, db
+from service.models import Product, Category, db, DataValidationError
 from service import app
 from tests.factories import ProductFactory
 
@@ -104,3 +104,154 @@ class TestProductModel(unittest.TestCase):
     #
     # ADD YOUR TEST CASES HERE
     #
+    def test_read_a_product(self):
+        'Read a product from the database'
+        product: Product = ProductFactory()
+        app.logger.debug(f'product: {product}')
+        product.id = None
+        product.create()
+        self.assertIsNotNone(product.id)
+
+        db_product = Product.find(product.id)
+        self.assertEqual(product.id, db_product.id)
+        self.assertEqual(product.name, db_product.name)
+        self.assertEqual(product.description, db_product.description)
+        self.assertEqual(product.available, db_product.available)
+        self.assertEqual(product.category, db_product.category)
+
+    def test_update_a_product(self):
+        'Update a product in the database'
+        product = ProductFactory()
+        app.logger.debug(f'product: {product}')
+        product.id = None
+        product.create()
+        app.logger.debug(f'product: {product}')
+        product.description = description = "new description!"
+        prev_id = product.id
+        product.update()
+        self.assertEqual(prev_id, product.id)
+        self.assertEqual(description, product.description)
+        products = Product.all()
+        self.assertEqual(len(products), 1)
+        self.assertEqual(products[0].id, product.id)
+        self.assertEqual(products[0].description, product.description)
+
+    def test_update_a_nonexistent_product(self):
+        'Error when updating a nonexistent product in the database'
+        product = ProductFactory()
+        app.logger.debug(f'product: {product}')
+        product.id = None
+        self.assertRaises(DataValidationError, product.update)
+
+    def test_delete_a_product(self):
+        'Delete a product in the database'
+        product = ProductFactory()
+        app.logger.debug(f'product: {product}')
+        product.id = None
+        product.create()
+        self.assertEqual(len(Product.all()), 1)
+        product.delete()
+        self.assertEqual(len(Product.all()), 0)
+
+    def test_list_all_products(self):
+        'List all products'
+        self.assertEqual(len(Product.all()), 0)
+        for product in ProductFactory.create_batch(5):
+            product.create()
+        self.assertEqual(len(Product.all()), 5)
+
+    def test_find_product_by_name(self):
+        'Find a product by name'
+        products = ProductFactory.create_batch(50)  # 5 is too small to get multiple of same type reliably
+        for product in products:
+            product.create()
+
+        name0 = products[0].name
+        count = sum(1 for product in products if product.name == name0)
+        db_products = Product.find_by_name(name0)
+        self.assertEqual(db_products.count(), count)
+        for product in db_products:
+            self.assertEqual(product.name, name0)
+
+    def test_find_product_by_availability(self):
+        'Find a product by availability'
+        products = ProductFactory.create_batch(10)
+        for product in products:
+            product.create()
+
+        available0 = products[0].available
+        count = sum(1 for product in products if product.available == available0)
+        db_products = Product.find_by_availability(available0)
+        self.assertEqual(db_products.count(), count)
+        for product in db_products:
+            self.assertEqual(product.available, available0)
+
+    def test_find_product_by_category(self):
+        'Find a product by category'
+        products = ProductFactory.create_batch(10)
+        for product in products:
+            product.create()
+
+        category0 = products[0].category
+        count = sum(1 for product in products if product.category == category0)
+        db_products = Product.find_by_category(category0)
+        self.assertEqual(db_products.count(), count)
+        for product in db_products:
+            self.assertEqual(product.category, category0)
+
+    def test_find_product_by_price(self):
+        'Find a product by price'
+        products = ProductFactory.create_batch(10)
+        for product in products:
+            product.create()
+
+        price0 = products[0].price
+        count = sum(1 for product in products if product.price == price0)
+        db_products = Product.find_by_price(price0)
+        self.assertEqual(db_products.count(), count)
+        for product in db_products:
+            self.assertEqual(product.price, price0)
+
+    def test_find_product_by_price_str(self):
+        'Find a product by price'
+        products = ProductFactory.create_batch(10)
+        for product in products:
+            product.create()
+
+        price0 = products[0].price
+        count = sum(1 for product in products if product.price == price0)
+        db_products = Product.find_by_price(str(price0))
+        self.assertEqual(db_products.count(), count)
+        for product in db_products:
+            self.assertEqual(product.price, price0)
+
+    def test_deserialize_bad_bool(self):
+        'Error when deserializing a string to "available: bool" field'
+        product = ProductFactory()
+        json = product.serialize()
+        json['available'] = 'Cassandra'  # not a valid bool string!
+        self.assertRaises(DataValidationError, lambda: Product().deserialize(json))
+
+    def test_deserialize_bad_price(self):
+        'Error when deserializing a string to "price: Decimal" field'
+        product = ProductFactory()
+        json = product.serialize()
+        json['price'] = 'Cassandra'  # not a valid bool string!
+        self.assertRaises(Exception, lambda: Product().deserialize(json))
+
+    def test_deserialize_missing_attribute(self):
+        'Error when deserializing due to missing attribute "description"'
+        product = ProductFactory()
+        json = product.serialize()
+        self.assertIn('description', json)
+        json.pop('description')
+        self.assertIsNotNone('description', json)
+        self.assertRaises(DataValidationError, lambda: Product().deserialize(json))
+
+    def test_deserialize_garbage_none(self):
+        'Error when deserializing garbage None"'
+        self.assertRaises(DataValidationError, lambda: Product().deserialize(None))
+
+    def test_deserialize_garbage_list(self):
+        'Error when deserializing garbage list"'
+        self.assertRaises(DataValidationError, lambda: Product().deserialize([]))

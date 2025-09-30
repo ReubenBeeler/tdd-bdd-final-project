@@ -166,6 +166,55 @@ class TestProductRoutes(TestCase):
     #
     # ADD YOUR TEST CASES HERE
     #
+    def test_get_product(self):
+        'Read a product'
+        test_product = self._create_products(1)[0]
+        response = self.client.get(f'{BASE_URL}/{test_product.id}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.get_json()['description'], test_product.description)
+
+    def test_get_product_not_found(self):
+        'Read a product'
+        response = self.client.get(f'{BASE_URL}/0')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_update_product(self):
+        test_product = self._create_products(1)[0]
+        test_product.description = 'test description'
+        response = self.client.put(f'{BASE_URL}/{test_product.id}', json=test_product.serialize())
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(Product().deserialize(response.get_json()).description, test_product.description)
+
+        # make sure it persists
+        response = self.client.get(f'{BASE_URL}/{test_product.id}')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.get_json()['description'], test_product.description)
+
+    def test_update_product_not_found(self):
+        test_product = self._create_products(1)[0]
+        test_product.description = 'test description'
+        response = self.client.put(f'{BASE_URL}/0', json=test_product.serialize())
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_update_product_invalid_serialization(self):
+        test_product = self._create_products(1)[0]
+        test_product.description = 'test description'
+        response = self.client.put(f'{BASE_URL}/{test_product.id}', json={"foo": "bar"})
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_list_products(self):
+        response = self.client.get(BASE_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIsInstance(response.get_json(), list)
+
+    def test_delete_product(self):
+        test_product = self._create_products(1)[0]
+        response = self.client.delete(f'{BASE_URL}/{test_product.id}')
+        self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
+
+    def test_delete_product_bad_id(self):
+        response = self.client.delete(f'{BASE_URL}/0')
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     ######################################################################
     # Utility functions

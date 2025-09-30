@@ -20,7 +20,7 @@ Product Store Service with UI
 """
 from flask import jsonify, request, abort
 from flask import url_for  # noqa: F401 pylint: disable=unused-import
-from service.models import Product
+from service.models import Product, DataValidationError
 from service.common import status  # HTTP Status Codes
 from . import app
 
@@ -101,6 +101,14 @@ def create_products():
 #
 # PLACE YOUR CODE TO LIST ALL PRODUCTS HERE
 #
+@app.route("/products", methods=["GET"])
+def list_products():
+    """
+    This endpoint will list all products
+    """
+    products = Product.all()
+    return products, status.HTTP_200_OK
+
 
 ######################################################################
 # R E A D   A   P R O D U C T
@@ -109,6 +117,20 @@ def create_products():
 #
 # PLACE YOUR CODE HERE TO READ A PRODUCT
 #
+@app.route("/products/<int:id>", methods=["GET"])
+def read_product(id: int):
+    """ This endpoint will read a product"""
+
+    # try:
+    product = Product.find(id)
+    # except BaseException as e:
+    #     return {"message": e}, status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    if product is None:
+        abort(status.HTTP_404_NOT_FOUND, f"product not found with id={id}")
+
+    return product.serialize(), status.HTTP_200_OK
+
 
 ######################################################################
 # U P D A T E   A   P R O D U C T
@@ -117,6 +139,26 @@ def create_products():
 #
 # PLACE YOUR CODE TO UPDATE A PRODUCT HERE
 #
+@app.route("/products/<int:id>", methods=["PUT"])
+def update_product(id: int):
+    """ This endpoint will update a product"""
+    app.logger.debug(f'Request to update product with id: {id}')
+    # try:
+    product = Product.find(id)
+    # except BaseException as e:
+    #     return {"message": e}, status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    if product is None:
+        abort(status.HTTP_404_NOT_FOUND, f"product not found with id={id}")
+
+    try:
+        product.deserialize(request.get_json())
+    except DataValidationError as e:
+        abort(status.HTTP_400_BAD_REQUEST, e.args[0])
+
+    product.update()
+    return product.serialize(), status.HTTP_200_OK
+
 
 ######################################################################
 # D E L E T E   A   P R O D U C T
@@ -126,3 +168,18 @@ def create_products():
 #
 # PLACE YOUR CODE TO DELETE A PRODUCT HERE
 #
+
+@app.route("/products/<int:id>", methods=["DELETE"])
+def delete_product(id: int):
+    """ This endpoint will delete a product"""
+    app.logger.debug(f'Request to delete product with id: {id}')
+    # try:
+    product = Product.find(id)
+    # except BaseException as e:
+    #     return {"message": e}, status.HTTP_500_INTERNAL_SERVER_ERROR
+
+    if product is None:
+        abort(status.HTTP_404_NOT_FOUND, f"product not found with id={id}")
+
+    product.delete()
+    return {}, status.HTTP_204_NO_CONTENT
