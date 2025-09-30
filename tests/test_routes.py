@@ -28,6 +28,8 @@ import os
 import logging
 from decimal import Decimal
 from unittest import TestCase
+from urllib.parse import quote_plus
+
 from service import app
 from service.common import status
 from service.models import db, init_db, Product
@@ -179,6 +181,7 @@ class TestProductRoutes(TestCase):
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_product(self):
+        'Update a product successfully'
         test_product = self._create_products(1)[0]
         test_product.description = 'test description'
         response = self.client.put(f'{BASE_URL}/{test_product.id}', json=test_product.serialize())
@@ -191,28 +194,84 @@ class TestProductRoutes(TestCase):
         self.assertEqual(response.get_json()['description'], test_product.description)
 
     def test_update_product_not_found(self):
+        'Fail to update product when product not found'
         test_product = self._create_products(1)[0]
         test_product.description = 'test description'
         response = self.client.put(f'{BASE_URL}/0', json=test_product.serialize())
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_update_product_invalid_serialization(self):
+        'Fail to update product with invalid serialization'
         test_product = self._create_products(1)[0]
         test_product.description = 'test description'
         response = self.client.put(f'{BASE_URL}/{test_product.id}', json={"foo": "bar"})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_list_products(self):
+        'List products and check length'
+        self._create_products(5)
         response = self.client.get(BASE_URL)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertIsInstance(response.get_json(), list)
+        json = response.get_json()
+        self.assertIsInstance(json, list)
+        self.assertEqual(len(json), 5)
+
+    def test_query_by_name(self):
+        """It should Query Products by name"""
+        products = self._create_products(5)
+        test_name = products[0].name
+        name_count = len([product for product in products if product.name == test_name])
+        response = self.client.get(
+            BASE_URL, query_string=f"name={quote_plus(test_name)}"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), name_count)
+        # check the data just to be sure
+        for product in data:
+            self.assertEqual(product["name"], test_name)
+
+    def test_query_by_category(self):
+        """It should Query Products by category"""
+        products = self._create_products(10)
+        category = products[0].category
+        found = [product for product in products if product.category == category]
+        found_count = len(found)
+        logging.debug("Found Products [%d] %s", found_count, found)
+
+        # test for available
+        response = self.client.get(BASE_URL, query_string=f"category={category.name}")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), found_count)
+        # check the data just to be sure
+        for product in data:
+            self.assertEqual(product["category"], category.name)
+
+    def test_query_by_availability(self):
+        """It should Query Products by availability"""
+        products = self._create_products(10)
+        available_products = [product for product in products if product.available is True]
+        available_count = len(available_products)
+        # test for available
+        response = self.client.get(
+            BASE_URL, query_string="available=true"
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.get_json()
+        self.assertEqual(len(data), available_count)
+        # check the data just to be sure
+        for product in data:
+            self.assertEqual(product["available"], True)
 
     def test_delete_product(self):
+        'Delete product succesfully'
         test_product = self._create_products(1)[0]
         response = self.client.delete(f'{BASE_URL}/{test_product.id}')
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
     def test_delete_product_bad_id(self):
+        'Delete product that does not exist'
         response = self.client.delete(f'{BASE_URL}/0')
         self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
 
